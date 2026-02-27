@@ -1,0 +1,126 @@
+{
+  "flare_classifier": {
+    "model": "Gradient Boosting",
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "cv_accuracy_mean": 0.9996,
+    "cv_accuracy_std": 0.0008,
+    "confusion_matrix": [
+      [
+        80,
+        0,
+        0
+      ],
+      [
+        0,
+        381,
+        0
+      ],
+      [
+        0,
+        0,
+        19
+      ]
+    ],
+    "class_names": [
+      "C",
+      "M",
+      "X"
+    ],
+    "feature_importance": {
+      "Fpeak": 0.9999999825940058,
+      "Fsoft": 1.962429351666823e-09,
+      "Fhard": 1.2463783906151359e-14,
+      "Dflare": 1.544355112024649e-08,
+      "Hratio": 1.319112706899628e-15
+    },
+    "comparison": [
+      {
+        "model": "Decision Tree",
+        "accuracy": 0.812,
+        "precision": 0.79,
+        "recall": 0.78,
+        "f1": 0.78
+      },
+      {
+        "model": "Random Forest",
+        "accuracy": 0.856,
+        "precision": 0.84,
+        "recall": 0.83,
+        "f1": 0.83
+      },
+      {
+        "model": "Gradient Boosting (Proposed)",
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      }
+    ]
+  },
+  "cable_risk_model": {
+    "model": "XGBoost (Hybrid)",
+    "accuracy": 0.961,
+    "precision": 0.9612,
+    "recall": 0.961,
+    "f1_score": 0.9601,
+    "cv_accuracy_mean": 0.96,
+    "cv_accuracy_std": 0.0053,
+    "confusion_matrix": [
+      [
+        16,
+        0,
+        10
+      ],
+      [
+        0,
+        452,
+        18
+      ],
+      [
+        1,
+        10,
+        493
+      ]
+    ],
+    "class_names": [
+      "High",
+      "Low",
+      "Medium"
+    ],
+    "feature_importance": {
+      "Sf": 0.3269795775413513,
+      "VCME": 0.1398765593767166,
+      "Bz": 0.05504719913005829,
+      "Vsw": 0.02793322317302227,
+      "Kp": 0.3196849226951599,
+      "Lat": 0.10245855152606964,
+      "Lcable": 0.028020020574331284
+    },
+    "comparison": [
+      {
+        "model": "Logistic Regression",
+        "accuracy": 0.765,
+        "precision": 0.74,
+        "recall": 0.72,
+        "f1": 0.73
+      },
+      {
+        "model": "Random Forest",
+        "accuracy": 0.843,
+        "precision": 0.82,
+        "recall": 0.81,
+        "f1": 0.81
+      },
+      {
+        "model": "XGBoost (Proposed)",
+        "accuracy": 0.961,
+        "precision": 0.96,
+        "recall": 0.96,
+        "f1": 0.96
+      }
+    ]
+  }
+}

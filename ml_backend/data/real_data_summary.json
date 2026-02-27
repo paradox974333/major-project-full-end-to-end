@@ -1,0 +1,16 @@
+{
+  "real_kp_count": 61,
+  "real_bz_count": 9816,
+  "real_wind_speed_count": 9807,
+  "real_cme_count": 3148,
+  "real_cable_count": 485,
+  "storm_kp_count": 125,
+  "kp_stats": {
+    "mean": 5.44,
+    "std": 1.87
+  },
+  "bz_stats": {
+    "mean": 0.05,
+    "std": 3.95
+  }
+}
