@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# Next.js / frontend build output
+.next/
+out/
+.turbo/
+.vercel/
+coverage/
+.eslintcache
+*.tsbuildinfo
+
+# Python cache / virtual environments
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+env/
+ENV/
+
+# Logs and runtime files
+*.log
+*.pid
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local databases / notebooks
+*.sqlite
+*.sqlite3
+*.db
+.ipynb_checkpoints/
+
+# Editor / OS clutter
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+
+# Keep checked-in ML assets and project documentation
+!ml_backend/data/
+!ml_backend/data/**
+!ml_backend/models/
+!ml_backend/models/**

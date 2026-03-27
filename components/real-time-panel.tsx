@@ -1,31 +1,28 @@
 "use client"
 
-import { useQuery, useMutation } from "@tanstack/react-query"
-import type { SpaceWeather, ImpactResponse } from "@/lib/types"
-import { Loader2, AlertTriangle, RefreshCw } from "lucide-react"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import { AlertTriangle, Download, Loader2, RefreshCw } from "lucide-react"
+import { SectorImpactPanel } from "@/components/sector-impact-panel"
+import { exportImpactAsCsv, exportImpactAsJson } from "@/lib/export-utils"
+import type { ImpactResponse, SpaceWeather } from "@/lib/types"
 
 interface RealTimePanelProps {
   onImpactUpdate: (data: ImpactResponse) => void
+  onCableSelect: (cableId: string) => void
 }
 
-export function RealTimePanel({ onImpactUpdate }: RealTimePanelProps) {
-  // Fetch Space Weather
-  const {
-    data: weather,
-    isLoading,
-    refetch,
-  } = useQuery<SpaceWeather>({
+export function RealTimePanel({ onImpactUpdate, onCableSelect }: RealTimePanelProps) {
+  const { data: weather, isLoading } = useQuery<SpaceWeather>({
     queryKey: ["space-weather"],
     queryFn: async () => {
       const res = await fetch("/api/space-weather/realtime")
       if (!res.ok) throw new Error("Failed to fetch weather")
       return res.json()
     },
-    refetchInterval: 60000, // 1 min
+    refetchInterval: 60000,
   })
 
-  // Calculate Impact Mutation
-  const impactMutation = useMutation({
+  const impactMutation = useMutation<ImpactResponse>({
     mutationFn: async () => {
       const res = await fetch("/api/impact/realtime", { method: "POST" })
       if (!res.ok) throw new Error("Failed to calculate impact")
@@ -36,12 +33,13 @@ export function RealTimePanel({ onImpactUpdate }: RealTimePanelProps) {
     },
   })
 
-  if (isLoading)
+  if (isLoading) {
     return (
       <div className="p-4 text-cyan-500">
         <Loader2 className="animate-spin" /> Loading telemetry...
       </div>
     )
+  }
 
   if (!weather) return <div className="p-4 text-red-500">Telemetry Offline</div>
 
@@ -54,7 +52,6 @@ export function RealTimePanel({ onImpactUpdate }: RealTimePanelProps) {
 
   return (
     <div className="space-y-6 p-4">
-      {/* Solar Wind Card */}
       <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 backdrop-blur-sm">
         <h3 className="text-cyan-400 text-sm font-semibold uppercase tracking-wider mb-3 flex items-center gap-2">
           <RefreshCw className="w-3 h-3" /> Solar Wind (L1)
@@ -66,12 +63,10 @@ export function RealTimePanel({ onImpactUpdate }: RealTimePanelProps) {
           </div>
           <div>
             <div className="text-2xl font-mono font-bold text-white">{weather.solarWind.densityPcm3.toFixed(1)}</div>
-            <div className="text-xs text-slate-400">p/cm³</div>
+            <div className="text-xs text-slate-400">p/cm3</div>
           </div>
           <div>
-            <div
-              className={`text-2xl font-mono font-bold ${weather.solarWind.bzNtl < -5 ? "text-red-400" : "text-white"}`}
-            >
+            <div className={`text-2xl font-mono font-bold ${weather.solarWind.bzNtl < -5 ? "text-red-400" : "text-white"}`}>
               {weather.solarWind.bzNtl.toFixed(1)}
             </div>
             <div className="text-xs text-slate-400">Bz (nT)</div>
@@ -79,12 +74,11 @@ export function RealTimePanel({ onImpactUpdate }: RealTimePanelProps) {
         </div>
         {weather.solarWind.bzNtl < -5 && (
           <div className="mt-3 text-xs text-red-400 flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3" /> Southward Bz detected: Increased coupling risk.
+            <AlertTriangle className="w-3 h-3" /> Southward Bz detected: increased coupling risk.
           </div>
         )}
       </div>
 
-      {/* Kp Index Card */}
       <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 backdrop-blur-sm">
         <h3 className="text-cyan-400 text-sm font-semibold uppercase tracking-wider mb-3">Planetary K-Index</h3>
         <div className="flex items-center justify-between">
@@ -96,52 +90,90 @@ export function RealTimePanel({ onImpactUpdate }: RealTimePanelProps) {
             <div className="text-xs text-slate-400">NOAA Scale</div>
           </div>
         </div>
-        <div className="mt-4 flex gap-1 h-2">
-          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
-            <div
-              key={i}
-              className={`flex-1 rounded-sm ${i <= Math.floor(weather.kp.current) ? getKpColor(i) : "bg-slate-800"}`}
-            />
-          ))}
-        </div>
       </div>
 
-      {/* Action */}
       <button
         onClick={() => impactMutation.mutate()}
         disabled={impactMutation.isPending}
         className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-md transition-all shadow-[0_0_15px_rgba(8,145,178,0.5)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {impactMutation.isPending ? <Loader2 className="animate-spin" /> : "PREDICT CABLE IMPACT"}
+        {impactMutation.isPending ? <Loader2 className="animate-spin" /> : "PREDICT STORM IMPACT"}
       </button>
 
-      {/* Results Summary */}
-      {impactMutation.data && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-semibold text-slate-300">High Risk Cables</h4>
-          <div className="max-h-48 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-slate-700">
-            {impactMutation.data.cableAggregates.slice(0, 5).map((cable) => (
-              <div
-                key={cable.cableId}
-                className="bg-slate-800/50 p-2 rounded border border-slate-700 flex justify-between items-center"
-              >
-                <div className="truncate max-w-[60%] text-sm text-slate-200">{cable.cableName}</div>
-                <div
-                  className={`text-xs font-bold px-2 py-1 rounded ${
-                    cable.maxRisk > 0.7
-                      ? "bg-red-900 text-red-200"
-                      : cable.maxRisk > 0.4
-                        ? "bg-orange-900 text-orange-200"
-                        : "bg-green-900 text-green-200"
-                  }`}
-                >
-                  {(cable.maxRisk * 100).toFixed(0)}% Risk
+      {impactMutation.data ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-center">
+              <div className="text-[11px] text-slate-500">Segments</div>
+              <div className="text-sm font-semibold text-white">{impactMutation.data.summary.totalSegments}</div>
+            </div>
+            <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-center">
+              <div className="text-[11px] text-slate-500">High-Risk Segments</div>
+              <div className="text-sm font-semibold text-white">{impactMutation.data.summary.highRiskSegments}</div>
+            </div>
+            <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-center">
+              <div className="text-[11px] text-slate-500">High-Risk Cables</div>
+              <div className="text-sm font-semibold text-white">{impactMutation.data.summary.highRiskCables}</div>
+            </div>
+            <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-center">
+              <div className="text-[11px] text-slate-500">High-Risk Systems</div>
+              <div className="text-sm font-semibold text-white">{impactMutation.data.summary.highRiskSystems ?? 0}</div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Closest Historical Match</div>
+            {impactMutation.data.matchedEvents[0] ? (
+              <>
+                <div className="text-sm font-semibold text-white">{impactMutation.data.matchedEvents[0].name}</div>
+                <div className="text-xs text-slate-400 mt-1">
+                  {impactMutation.data.matchedEvents[0].date} - {Math.round(impactMutation.data.matchedEvents[0].similarity * 100)}% match
                 </div>
-              </div>
-            ))}
+                <div className="text-xs text-slate-300 mt-2">{impactMutation.data.matchedEvents[0].matchReason}</div>
+              </>
+            ) : (
+              <div className="text-sm text-slate-500">Historical comparison will appear after a run.</div>
+            )}
+          </div>
+
+          <SectorImpactPanel sectorImpacts={impactMutation.data.sectorImpacts} />
+
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-slate-300">Highest Risk Cables</h4>
+            <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+              {impactMutation.data.cableAggregates.slice(0, 6).map((cable) => (
+                <button
+                  key={cable.cableId}
+                  onClick={() => onCableSelect(cable.cableId)}
+                  className="w-full bg-slate-800/50 p-2 rounded border border-slate-700 flex justify-between items-center hover:border-cyan-500/40"
+                >
+                  <div className="truncate max-w-[60%] text-sm text-slate-200 text-left">{cable.cableName}</div>
+                  <div className="text-xs font-bold px-2 py-1 rounded bg-cyan-500/10 text-cyan-200">
+                    {(cable.maxRisk * 100).toFixed(0)}%
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => exportImpactAsJson("realtime-impact-report.json", impactMutation.data)}
+              className="flex-1 rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:border-cyan-500/40"
+            >
+              <Download className="inline w-3 h-3 mr-1" />
+              Export JSON
+            </button>
+            <button
+              onClick={() => exportImpactAsCsv("realtime-impact-report.csv", impactMutation.data)}
+              className="flex-1 rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:border-cyan-500/40"
+            >
+              <Download className="inline w-3 h-3 mr-1" />
+              Export CSV
+            </button>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

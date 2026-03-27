@@ -37,13 +37,14 @@ function estimateLengthKm(coordinates: [number, number][]): number {
     return Math.max(totalKm, 100) // minimum 100km
 }
 
-const processedCables = (cablesData as CableSegment[]).map((cable) => ({
+const processedCables = (cablesData as Array<Omit<CableSegment, "coordinates"> & { coordinates: number[][] }>).map((cable) => ({
     ...cable,
+    coordinates: cable.coordinates.map(([lon, lat]) => [lon, lat] as [number, number]),
     name:
         cable.name && cable.name !== "Unknown Cable"
             ? cable.name
             : formatCableName(cable.id),
-    lengthKm: cable.lengthKm > 0 ? cable.lengthKm : estimateLengthKm(cable.coordinates),
+    lengthKm: cable.lengthKm > 0 ? cable.lengthKm : estimateLengthKm(cable.coordinates.map(([lon, lat]) => [lon, lat] as [number, number])),
 }))
 
 export const CACHED_CABLES = processedCables

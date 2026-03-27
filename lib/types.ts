@@ -1,3 +1,5 @@
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+
 export interface CableSegment {
   id: string
   name: string
@@ -22,15 +24,132 @@ export interface SpaceWeather {
   }
 }
 
+export interface RiskDriver {
+  key: string
+  label: string
+  value: number
+  displayValue: string
+  rationale: string
+}
+
+export interface SegmentExplanation {
+  headline: string
+  drivers: RiskDriver[]
+}
+
+export interface HistoricalReplayPreset {
+  label: string
+  startTime: string
+  cmeSpeedKms: number
+  directionLon: number
+  directionLat: number
+}
+
+export interface HistoricalEvent {
+  id: string
+  name: string
+  date: string
+  flareClass: "C" | "M" | "X"
+  peakKp: number
+  cmeSpeedKms: number
+  bzNtl: number
+  bzIsEstimated?: boolean
+  severity: "Moderate" | "Strong" | "Severe" | "Extreme"
+  dataSource?: string
+  sourceLocation?: string
+  activeRegionNum?: number | null
+  link?: string
+  regions: string[]
+  affectedSystems?: string[]
+  description: string
+  impacts: string[]
+  replay: HistoricalReplayPreset
+}
+
+export interface HistoricalMatch {
+  eventId: string
+  name: string
+  date: string
+  flareClass: "C" | "M" | "X"
+  severity: HistoricalEvent["severity"]
+  peakKp: number
+  cmeSpeedKms: number
+  similarity: number
+  matchReason: string
+}
+
 export interface CableSegmentRisk {
   cableId: string
   cableName: string
   segmentIndex: number
-  riskScore: number // 0-1
-  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+  segmentLengthKm: number
+  riskScore: number
+  riskLevel: RiskLevel
   meanLat: number
   meanLon: number
+  directionalExposure?: number
+  modelConfidence?: number
+  riskProbabilities?: { Low: number; Medium: number; High: number }
+  explanation?: SegmentExplanation
   coordinates: [number, number][]
+}
+
+export interface CableAggregateRisk {
+  cableId: string
+  cableName: string
+  maxRisk: number
+  meanRisk: number
+  hotspotCount: number
+  topDrivers: RiskDriver[]
+  worstSegment: {
+    lat: number
+    lon: number
+    riskScore: number
+    segmentIndex: number
+  }
+}
+
+export interface ImpactSummary {
+  totalSegments: number
+  impactedSegments: number
+  highRiskSegments: number
+  watchedCableAlerts: number
+  highRiskCables: number
+  highRiskSystems?: number
+}
+
+export interface SectorImpact {
+  id:
+    | "submarine-cables"
+    | "power-grids"
+    | "satellites"
+    | "gnss"
+    | "hf-radio"
+    | "aviation"
+    | "pipelines"
+    | "auroral-activity"
+  label: string
+  riskScore: number
+  riskLevel: RiskLevel
+  status: string
+  whyAffected: string
+  likelyEffects: string[]
+  mitigationHint: string
+}
+
+export interface ScenarioContext {
+  source: "realtime" | "simulation"
+  fetchedAt: string
+  flareSeverity: number
+  cmeSpeedKms: number
+  solarWindSpeedKms: number
+  densityPcm3?: number
+  bzNtl: number
+  kp: number
+  directionLat?: number
+  directionLon?: number
+  startTime?: string
+  predictedArrivalTime?: string
 }
 
 export interface ImpactResponse {
@@ -38,13 +157,13 @@ export interface ImpactResponse {
   globalKp: number
   gScale: string
   segmentRisks: CableSegmentRisk[]
-  cableAggregates: {
-    cableId: string
-    cableName: string
-    maxRisk: number
-    meanRisk: number
-    worstSegment: { lat: number; lon: number; riskScore: number }
-  }[]
+  cableAggregates: CableAggregateRisk[]
+  sectorImpacts: SectorImpact[]
+  matchedEvents: HistoricalMatch[]
+  scenario: ScenarioContext
+  summary: ImpactSummary
+  modelUsed: string
+  fallbackUsed?: boolean
 }
 
 export interface SimulationParams {
@@ -62,8 +181,6 @@ export interface SimulationResponse extends ImpactResponse {
   predictedArrivalTime: string
   syntheticKpPeak: number
 }
-
-// ── ML Model Types ──────────────────────────────────────────
 
 export interface FlareInput {
   Fpeak: number
@@ -105,4 +222,23 @@ export interface SingleModelMetrics {
 export interface ModelMetrics {
   flare_classifier: SingleModelMetrics
   cable_risk_model: SingleModelMetrics
+}
+
+export interface ModelCredibility {
+  dataCoverage: {
+    realCableCount: number
+    realCmeCount: number
+    realBzCount: number
+    realWindSpeedCount: number
+    realKpCount: number
+    stormKpCount: number
+  }
+  warnings: string[]
+  strengths: string[]
+  recommendations: string[]
+}
+
+export interface WatchlistItem {
+  cableId: string
+  threshold: number
 }

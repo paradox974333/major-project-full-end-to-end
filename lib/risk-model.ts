@@ -1,7 +1,7 @@
-import type { CableSegment, CableSegmentRisk, SpaceWeather } from "./types"
+import type { CableSegment, CableSegmentRisk, RiskLevel, SpaceWeather } from "./types"
 
 // Helper to map risk score to level
-export function getRiskLevel(score: number): "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" {
+export function getRiskLevel(score: number): RiskLevel {
   if (score >= 0.7) return "CRITICAL"
   if (score >= 0.4) return "HIGH"
   if (score >= 0.2) return "MEDIUM"
@@ -63,6 +63,7 @@ export function calculateRealTimeRisk(cables: CableSegment[], weather: SpaceWeat
       cableId: cable.id,
       cableName: cable.name,
       segmentIndex: 0,
+      segmentLengthKm: cable.lengthKm,
       riskScore: rawRisk,
       riskLevel: getRiskLevel(rawRisk),
       meanLat: cable.meanLat,
@@ -112,10 +113,12 @@ export function calculateSimulationRisk(
       cableId: cable.id,
       cableName: cable.name,
       segmentIndex: 0,
+      segmentLengthKm: cable.lengthKm,
       riskScore: rawRisk,
       riskLevel: getRiskLevel(rawRisk),
       meanLat: cable.meanLat,
       meanLon: cable.meanLon,
+      directionalExposure: footprintWeight,
       coordinates: cable.coordinates,
     })
   })

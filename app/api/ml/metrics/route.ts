@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server"
-
-const ML_BACKEND = "http://localhost:8000"
+import { fetchModelMetrics } from "@/lib/server/ml-client"
 
 export async function GET() {
-    try {
-        const res = await fetch(`${ML_BACKEND}/model/metrics`)
-        if (!res.ok) throw new Error("ML backend error")
-        return NextResponse.json(await res.json())
-    } catch {
-        return NextResponse.json(
-            { error: "ML backend unavailable" },
-            { status: 503 }
-        )
-    }
+  try {
+    return NextResponse.json(await fetchModelMetrics())
+  } catch {
+    return NextResponse.json({ error: "ML backend unavailable" }, { status: 503 })
+  }
 }
