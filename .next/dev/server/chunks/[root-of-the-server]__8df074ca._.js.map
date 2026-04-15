@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 46, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/athen/Downloads/major-project-main/major-project-main/app/api/ml/metrics/route.ts"],"sourcesContent":["import { NextResponse } from \"next/server\"\r\n\r\nconst ML_BACKEND = \"http://localhost:8000\"\r\n\r\nexport async function GET() {\r\n    try {\r\n        const res = await fetch(`${ML_BACKEND}/model/metrics`)\r\n        if (!res.ok) throw new Error(\"ML backend error\")\r\n        return NextResponse.json(await res.json())\r\n    } catch {\r\n        return NextResponse.json(\r\n            { error: \"ML backend unavailable\" },\r\n            { status: 503 }\r\n        )\r\n    }\r\n}\r\n"],"names":[],"mappings":";;;;AAAA;;AAEA,MAAM,aAAa;AAEZ,eAAe;IAClB,IAAI;QACA,MAAM,MAAM,MAAM,MAAM,GAAG,WAAW,cAAc,CAAC;QACrD,IAAI,CAAC,IAAI,EAAE,EAAE,MAAM,IAAI,MAAM;QAC7B,OAAO,qNAAY,CAAC,IAAI,CAAC,MAAM,IAAI,IAAI;IAC3C,EAAE,OAAM;QACJ,OAAO,qNAAY,CAAC,IAAI,CACpB;YAAE,OAAO;QAAyB,GAClC;YAAE,QAAQ;QAAI;IAEtB;AACJ"}}]
-}

@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/athen/Downloads/space-weather-impact-predictor/app/providers.tsx"],"sourcesContent":["\"use client\"\n\nimport type React from \"react\"\n\nimport { QueryClient, QueryClientProvider } from \"@tanstack/react-query\"\nimport { useState } from \"react\"\n\nexport function Providers({ children }: { children: React.ReactNode }) {\n  const [queryClient] = useState(() => new QueryClient())\n\n  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>\n}\n"],"names":[],"mappings":";;;;;AAIA;AAAA;AACA;;;AALA;;;AAOO,SAAS,UAAU,EAAE,QAAQ,EAAiC;;IACnE,MAAM,CAAC,YAAY,GAAG,IAAA,iOAAQ;8BAAC,IAAM,IAAI,uPAAW;;IAEpD,qBAAO,qPAAC,wQAAmB;QAAC,QAAQ;kBAAc;;;;;;AACpD;GAJgB;KAAA"}}]
-}

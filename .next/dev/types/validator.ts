@@ -65,6 +65,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../../app/api/history/events/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/history/events">> = Specific
+  const handler = {} as typeof import("../../../app/api/history/events/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../../app/api/impact/realtime/route.ts
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/impact/realtime">> = Specific
@@ -87,6 +96,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/ml/cable-risk">> = Specific
   const handler = {} as typeof import("../../../app/api/ml/cable-risk/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/ml/credibility/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/ml/credibility">> = Specific
+  const handler = {} as typeof import("../../../app/api/ml/credibility/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check

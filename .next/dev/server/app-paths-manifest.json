@@ -1,9 +1,5 @@
 {
   "/api/cables/route": "app/api/cables/route.js",
-  "/api/impact/realtime/route": "app/api/impact/realtime/route.js",
-  "/api/impact/simulate/route": "app/api/impact/simulate/route.js",
-  "/api/ml/flare/route": "app/api/ml/flare/route.js",
-  "/api/ml/metrics/route": "app/api/ml/metrics/route.js",
   "/api/space-weather/realtime/route": "app/api/space-weather/realtime/route.js",
   "/page": "app/page.js"
 }
