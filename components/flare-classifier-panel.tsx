@@ -5,10 +5,18 @@ import { useMutation } from "@tanstack/react-query"
 import { Zap, AlertTriangle, Sun, Activity } from "lucide-react"
 import type { FlareInput, FlareClassification } from "@/lib/types"
 
+function hardnessRatio(Fsoft: number, Fhard: number) {
+    return Number(Math.min(Math.max(Math.pow(10, Fhard - Fsoft), 0.01), 25).toFixed(2))
+}
+
+function flareInput(input: Omit<FlareInput, "Hratio">): FlareInput {
+    return { ...input, Hratio: hardnessRatio(input.Fsoft, input.Fhard) }
+}
+
 const PRESETS: Record<string, FlareInput> = {
-    "C-class (Mild)": { Fpeak: -5.8, Fsoft: -5.9, Fhard: -5.7, Dflare: 300, Hratio: 0.15 },
-    "M-class (Moderate)": { Fpeak: -4.5, Fsoft: -4.6, Fhard: -4.3, Dflare: 900, Hratio: 0.20 },
-    "X-class (Extreme)": { Fpeak: -3.5, Fsoft: -3.7, Fhard: -3.2, Dflare: 1800, Hratio: 0.25 },
+    "C-class (Mild)": flareInput({ Fpeak: -5.8, Fsoft: -5.9, Fhard: -5.7, Dflare: 300 }),
+    "M-class (Moderate)": flareInput({ Fpeak: -4.5, Fsoft: -4.6, Fhard: -4.3, Dflare: 900 }),
+    "X-class (Extreme)": flareInput({ Fpeak: -3.5, Fsoft: -3.7, Fhard: -3.2, Dflare: 1800 }),
 }
 
 const CLASS_COLORS: Record<string, string> = {
@@ -20,9 +28,9 @@ const CLASS_LABELS: Record<string, string> = {
 }
 
 export function FlareClassifierPanel() {
-    const [form, setForm] = useState<FlareInput>({
-        Fpeak: -4.5, Fsoft: -4.6, Fhard: -4.3, Dflare: 900, Hratio: 0.20
-    })
+    const [form, setForm] = useState<FlareInput>(flareInput({
+        Fpeak: -4.5, Fsoft: -4.6, Fhard: -4.3, Dflare: 900
+    }))
 
     const mutation = useMutation({
         mutationFn: async (input: FlareInput): Promise<FlareClassification> => {
@@ -38,6 +46,16 @@ export function FlareClassifierPanel() {
 
     const loadPreset = (name: string) => {
         setForm(PRESETS[name])
+    }
+
+    const updateFormValue = (key: keyof FlareInput, value: number) => {
+        setForm((current) => {
+            const next = { ...current, [key]: value }
+            if (key === "Fsoft" || key === "Fhard") {
+                next.Hratio = hardnessRatio(next.Fsoft, next.Fhard)
+            }
+            return next
+        })
     }
 
     return (
@@ -66,11 +84,11 @@ export function FlareClassifierPanel() {
                     X-Ray Flux Parameters
                 </label>
                 {([
-                    ["Fpeak", "Peak Flux (log₁₀ W/m²)", -7, -2, 0.1],
-                    ["Fsoft", "Soft X-Ray (log₁₀)", -7, -2, 0.1],
-                    ["Fhard", "Hard X-Ray (log₁₀)", -7, -2, 0.1],
+                    ["Fpeak", "Peak Flux (log10 W/m^2)", -7, -2, 0.1],
+                    ["Fsoft", "Soft X-Ray (log10)", -7, -2, 0.1],
+                    ["Fhard", "Hard X-Ray (log10)", -7, -2, 0.1],
                     ["Dflare", "Duration (seconds)", 60, 7200, 60],
-                    ["Hratio", "Hardness Ratio", 0.01, 1.0, 0.01],
+                    ["Hratio", "Hardness Ratio", 0.01, 10.0, 0.01],
                 ] as const).map(([key, label, min, max, step]) => (
                     <div key={key}>
                         <div className="flex justify-between text-xs text-neutral-400 mb-1">
@@ -81,7 +99,7 @@ export function FlareClassifierPanel() {
                             type="range"
                             min={min} max={max} step={step}
                             value={form[key as keyof FlareInput]}
-                            onChange={e => setForm(f => ({ ...f, [key]: parseFloat(e.target.value) }))}
+                            onChange={e => updateFormValue(key as keyof FlareInput, parseFloat(e.target.value))}
                             className="w-full accent-cyan-500"
                         />
                     </div>

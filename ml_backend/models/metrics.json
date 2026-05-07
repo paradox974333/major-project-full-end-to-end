@@ -30,26 +30,26 @@
       "X"
     ],
     "feature_importance": {
-      "Fpeak": 0.9999999825940058,
-      "Fsoft": 1.962429351666823e-09,
-      "Fhard": 1.2463783906151359e-14,
-      "Dflare": 1.544355112024649e-08,
-      "Hratio": 1.319112706899628e-15
+      "Fpeak": 0.9999999825940059,
+      "Fsoft": 1.962429439760878e-09,
+      "Fhard": 1.2035030311033138e-14,
+      "Dflare": 1.5443550927921882e-08,
+      "Hratio": 1.6188835535864555e-15
     },
     "comparison": [
       {
         "model": "Decision Tree",
-        "accuracy": 0.812,
-        "precision": 0.79,
-        "recall": 0.78,
-        "f1": 0.78
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
       },
       {
         "model": "Random Forest",
-        "accuracy": 0.856,
-        "precision": 0.84,
-        "recall": 0.83,
-        "f1": 0.83
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
       },
       {
         "model": "Gradient Boosting (Proposed)",
@@ -61,28 +61,28 @@
     ]
   },
   "cable_risk_model": {
-    "model": "XGBoost (Hybrid)",
-    "accuracy": 0.961,
-    "precision": 0.9612,
-    "recall": 0.961,
-    "f1_score": 0.9601,
-    "cv_accuracy_mean": 0.96,
-    "cv_accuracy_std": 0.0053,
+    "model": "XGBoost (Hybrid classifier + regressor)",
+    "accuracy": 0.955,
+    "precision": 0.955,
+    "recall": 0.955,
+    "f1_score": 0.9534,
+    "cv_accuracy_mean": 0.9562,
+    "cv_accuracy_std": 0.0056,
     "confusion_matrix": [
       [
-        16,
+        23,
         0,
+        15
+      ],
+      [
+        0,
+        551,
         10
       ],
       [
-        0,
-        452,
-        18
-      ],
-      [
         1,
-        10,
-        493
+        19,
+        381
       ]
     ],
     "class_names": [
@@ -91,35 +91,55 @@
       "Medium"
     ],
     "feature_importance": {
-      "Sf": 0.3269795775413513,
-      "VCME": 0.1398765593767166,
-      "Bz": 0.05504719913005829,
-      "Vsw": 0.02793322317302227,
-      "Kp": 0.3196849226951599,
-      "Lat": 0.10245855152606964,
-      "Lcable": 0.028020020574331284
+      "Sf": 0.25126177072525024,
+      "VCME": 0.13052701950073242,
+      "Bz": 0.04908464848995209,
+      "Vsw": 0.028488459065556526,
+      "Kp": 0.34096580743789673,
+      "Lat": 0.1337229311466217,
+      "Lcable": 0.06594923883676529
+    },
+    "regression": {
+      "mae": 0.0052,
+      "rmse": 0.0083,
+      "r2": 0.9936,
+      "cv_r2_mean": 0.9928,
+      "cv_r2_std": 0.0008
+    },
+    "regression_feature_importance": {
+      "Sf": 0.32273659110069275,
+      "VCME": 0.1101006343960762,
+      "Bz": 0.017041413113474846,
+      "Vsw": 0.0013844575732946396,
+      "Kp": 0.3947243094444275,
+      "Lat": 0.12011031806468964,
+      "Lcable": 0.03390222042798996
+    },
+    "risk_thresholds": {
+      "low_medium": 0.25,
+      "medium_high": 0.45
     },
     "comparison": [
       {
         "model": "Logistic Regression",
-        "accuracy": 0.765,
-        "precision": 0.74,
-        "recall": 0.72,
-        "f1": 0.73
+        "accuracy": 0.916,
+        "precision": 0.9172,
+        "recall": 0.916,
+        "f1": 0.9122
       },
       {
         "model": "Random Forest",
-        "accuracy": 0.843,
-        "precision": 0.82,
-        "recall": 0.81,
-        "f1": 0.81
+        "accuracy": 0.952,
+        "precision": 0.953,
+        "recall": 0.952,
+        "f1": 0.95
       },
       {
         "model": "XGBoost (Proposed)",
-        "accuracy": 0.961,
-        "precision": 0.96,
-        "recall": 0.96,
-        "f1": 0.96
+        "accuracy": 0.955,
+        "precision": 0.955,
+        "recall": 0.955,
+        "f1": 0.9534
       }
     ]
   }

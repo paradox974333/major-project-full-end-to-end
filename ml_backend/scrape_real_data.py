@@ -19,6 +19,8 @@ import os
 import time
 from datetime import datetime, timedelta
 
+from risk_math import cable_risk_score, risk_category_from_score
+
 DONKI_BASE = "https://kauai.ccmc.gsfc.nasa.gov/DONKI/WS/get"
 NOAA_BASE = "https://services.swpc.noaa.gov"
 
@@ -420,20 +422,8 @@ def build_cable_risk_dataset():
         Lcable = np.random.choice(real_lengths) * np.random.normal(1.0, 0.2)
         Lcable = np.clip(Lcable, 50, 15000)
 
-        # Compute risk score using paper equations
-        I_interaction = Sf * abs(min(Bz, 0))
-        E_induced = I_interaction * Vsw / 1000.0
-        storm_factor = Kp / 9.0
-        cme_factor = (VCME - 300) / 2700.0
-
-        base_risk = (0.3 * storm_factor + 0.25 * cme_factor +
-                     0.25 * (E_induced / 50.0) + 0.2 * (Sf / 3.0))
-
-        alpha = 0.008
-        risk_score = base_risk * (1 + alpha * abs(Lat))
-        risk_score = np.clip(risk_score, 0, 1)
-
-        risk_category = "High" if risk_score >= 0.66 else ("Medium" if risk_score >= 0.33 else "Low")
+        risk_score = cable_risk_score(Sf, VCME, Bz, Vsw, Kp, Lat, Lcable)
+        risk_category = risk_category_from_score(risk_score)
 
         data.append({
             "Sf": int(Sf), "VCME": round(VCME, 1), "Bz": round(Bz, 2),

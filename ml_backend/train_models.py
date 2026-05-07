@@ -1,252 +1,398 @@
 """
-Model Training Pipeline for Solar Flare & Cable Risk Prediction
-================================================================
-Stage 1: Gradient Boosting classifier for solar flare intensity (C/M/X)
-Stage 2: Hybrid XGBoost model for cable risk prediction
+Training pipeline for the solar-flare and cable-risk ML models.
 
-Implements paper equations 1-14 for the hybrid predictive framework.
+The project uses ML as an educational layer over explicit proxy equations. This
+script keeps preprocessing inside the train/test split and cross-validation
+folds, saves reproducible artifacts, and records honest comparison metrics.
 """
 
 import json
 import os
+
+import joblib
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder
-from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    confusion_matrix, classification_report, roc_auc_score
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    mean_absolute_error,
+    mean_squared_error,
+    precision_score,
+    r2_score,
+    recall_score,
 )
-from xgboost import XGBClassifier
-import joblib
+from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score, train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from sklearn.tree import DecisionTreeClassifier
+from xgboost import XGBClassifier, XGBRegressor
 
-# Generate data if not present
-from generate_data import generate_solar_flare_data, generate_cable_risk_data
+from generate_data import generate_cable_risk_data, generate_solar_flare_data
+from risk_math import (
+    LOW_MEDIUM_THRESHOLD,
+    MEDIUM_HIGH_THRESHOLD,
+    cable_risk_score,
+    risk_category_from_score,
+)
+
+RANDOM_STATE = 42
+
+FLARE_FEATURES = ["Fpeak", "Fsoft", "Fhard", "Dflare", "Hratio"]
+CABLE_FEATURES = ["Sf", "VCME", "Bz", "Vsw", "Kp", "Lat", "Lcable"]
+
+
+def classification_metrics(y_true, y_pred):
+    return {
+        "accuracy": round(accuracy_score(y_true, y_pred), 4),
+        "precision": round(precision_score(y_true, y_pred, average="weighted", zero_division=0), 4),
+        "recall": round(recall_score(y_true, y_pred, average="weighted", zero_division=0), 4),
+        "f1_score": round(f1_score(y_true, y_pred, average="weighted", zero_division=0), 4),
+    }
+
+
+def comparison_row(model_name, y_true, y_pred):
+    metrics = classification_metrics(y_true, y_pred)
+    return {
+        "model": model_name,
+        "accuracy": metrics["accuracy"],
+        "precision": metrics["precision"],
+        "recall": metrics["recall"],
+        "f1": metrics["f1_score"],
+    }
+
+
+def evaluate_classifier_comparison(models, x_train, x_test, y_train, y_test):
+    rows = []
+    for name, estimator in models:
+        pipeline = make_pipeline(MinMaxScaler(), estimator)
+        pipeline.fit(x_train, y_train)
+        rows.append(comparison_row(name, y_test, pipeline.predict(x_test)))
+    return rows
+
+
+def load_flare_data():
+    path = "data/solar_flare_data.csv"
+    if os.path.exists(path):
+        df = pd.read_csv(path)
+    else:
+        df = generate_solar_flare_data(3000)
+        os.makedirs("data", exist_ok=True)
+        df.to_csv(path, index=False)
+
+    df = df[df["flare_class"].isin(["C", "M", "X"])].copy()
+    df = df.dropna(subset=FLARE_FEATURES + ["flare_class"])
+    return df
+
+
+def load_cable_data():
+    path = "data/cable_risk_data.csv"
+    if os.path.exists(path):
+        df = pd.read_csv(path)
+    else:
+        df = generate_cable_risk_data(5000)
+        os.makedirs("data", exist_ok=True)
+
+    df = df.dropna(subset=CABLE_FEATURES).copy()
+    df["risk_score"] = [
+        cable_risk_score(row.Sf, row.VCME, row.Bz, row.Vsw, row.Kp, row.Lat, row.Lcable)
+        for row in df.itertuples(index=False)
+    ]
+    df["risk_category"] = [risk_category_from_score(score) for score in df["risk_score"]]
+    df.to_csv(path, index=False)
+    return df
 
 
 def train_flare_classifier():
-    """
-    Stage 1: Gradient Boosting Solar Flare Classifier
-    
-    Feature vector (Eq.): Xf = {Fpeak, Fsoft, Fhard, Dflare, Hratio}
-    Prediction (Eq. 3): Yf = argmax P(Y=k|Xf) for k in {C, M, X}
-    Model (Eq. 4): Fm(x) = Fm-1(x) + γm·hm(x)
-    """
     print("=" * 60)
-    print("STAGE 1: Solar Flare Classification (Gradient Boosting)")
+    print("STAGE 1: Solar Flare Classification")
     print("=" * 60)
 
-    # Load or generate data
-    if os.path.exists("data/solar_flare_data.csv"):
-        df = pd.read_csv("data/solar_flare_data.csv")
-    else:
-        df = generate_solar_flare_data(3000)
-
-    features = ["Fpeak", "Fsoft", "Fhard", "Dflare", "Hratio"]
-    X = df[features].values
+    df = load_flare_data()
+    x = df[FLARE_FEATURES].values
     y = df["flare_class"].values
 
-    # Min-Max normalization (Eq. 1)
-    scaler = MinMaxScaler()
-    X_scaled = scaler.fit_transform(X)
+    label_encoder = LabelEncoder()
+    y_encoded = label_encoder.fit_transform(y)
 
-    # Encode labels
-    le = LabelEncoder()
-    y_encoded = le.fit_transform(y)
-
-    # Split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_scaled, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
+    x_train, x_test, y_train, y_test = train_test_split(
+        x,
+        y_encoded,
+        test_size=0.2,
+        random_state=RANDOM_STATE,
+        stratify=y_encoded,
     )
 
-    # Train Gradient Boosting (Eq. 4-5)
-    gb_model = GradientBoostingClassifier(
+    scaler = MinMaxScaler()
+    x_train_scaled = scaler.fit_transform(x_train)
+    x_test_scaled = scaler.transform(x_test)
+
+    model = GradientBoostingClassifier(
         n_estimators=200,
-        learning_rate=0.1,    # γm in Eq. 4
+        learning_rate=0.1,
         max_depth=5,
         min_samples_split=10,
         min_samples_leaf=5,
         subsample=0.8,
-        random_state=42
+        random_state=RANDOM_STATE,
     )
-    gb_model.fit(X_train, y_train)
+    model.fit(x_train_scaled, y_train)
 
-    # Evaluate
-    y_pred = gb_model.predict(X_test)
-    y_proba = gb_model.predict_proba(X_test)
-
-    accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred, average="weighted")
-    recall = recall_score(y_test, y_pred, average="weighted")
-    f1 = f1_score(y_test, y_pred, average="weighted")
+    y_pred = model.predict(x_test_scaled)
+    metrics = classification_metrics(y_test, y_pred)
     cm = confusion_matrix(y_test, y_pred)
 
-    print(f"\n  Accuracy:  {accuracy:.4f}")
-    print(f"  Precision: {precision:.4f}")
-    print(f"  Recall:    {recall:.4f}")
-    print(f"  F1-Score:  {f1:.4f}")
-    print(f"\n  Confusion Matrix:")
-    print(f"  {cm}")
+    cv_model = GradientBoostingClassifier(
+        n_estimators=200,
+        learning_rate=0.1,
+        max_depth=5,
+        min_samples_split=10,
+        min_samples_leaf=5,
+        subsample=0.8,
+        random_state=RANDOM_STATE,
+    )
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    cv_scores = cross_val_score(make_pipeline(MinMaxScaler(), cv_model), x, y_encoded, cv=cv, scoring="accuracy")
 
-    # Cross-validation
-    cv_scores = cross_val_score(gb_model, X_scaled, y_encoded, cv=5, scoring="accuracy")
-    print(f"\n  5-Fold CV Accuracy: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+    comparisons = evaluate_classifier_comparison(
+        [
+            ("Decision Tree", DecisionTreeClassifier(max_depth=8, random_state=RANDOM_STATE)),
+            ("Random Forest", RandomForestClassifier(n_estimators=200, random_state=RANDOM_STATE)),
+            (
+                "Gradient Boosting (Proposed)",
+                GradientBoostingClassifier(
+                    n_estimators=200,
+                    learning_rate=0.1,
+                    max_depth=5,
+                    min_samples_split=10,
+                    min_samples_leaf=5,
+                    subsample=0.8,
+                    random_state=RANDOM_STATE,
+                ),
+            ),
+        ],
+        x_train,
+        x_test,
+        y_train,
+        y_test,
+    )
 
-    # Feature importance
-    importances = dict(zip(features, gb_model.feature_importances_.tolist()))
-    print(f"\n  Feature Importance: {importances}")
+    importances = dict(zip(FLARE_FEATURES, model.feature_importances_.tolist()))
 
-    # Save model and artifacts
     os.makedirs("models", exist_ok=True)
-    joblib.dump(gb_model, "models/flare_classifier.joblib")
+    joblib.dump(model, "models/flare_classifier.joblib")
     joblib.dump(scaler, "models/flare_scaler.joblib")
-    joblib.dump(le, "models/flare_label_encoder.joblib")
+    joblib.dump(label_encoder, "models/flare_label_encoder.joblib")
 
-    flare_metrics = {
+    print(f"\n  Accuracy:  {metrics['accuracy']:.4f}")
+    print(f"  Precision: {metrics['precision']:.4f}")
+    print(f"  Recall:    {metrics['recall']:.4f}")
+    print(f"  F1-Score:  {metrics['f1_score']:.4f}")
+    print("\n  Confusion Matrix:")
+    print(f"  {cm}")
+    print(f"\n  5-Fold CV Accuracy: {cv_scores.mean():.4f} +/- {cv_scores.std():.4f}")
+    print(f"\n  Feature Importance: {importances}")
+    print("\n  [OK] Flare classifier saved")
+
+    return {
         "model": "Gradient Boosting",
-        "accuracy": round(accuracy, 4),
-        "precision": round(precision, 4),
-        "recall": round(recall, 4),
-        "f1_score": round(f1, 4),
-        "cv_accuracy_mean": round(cv_scores.mean(), 4),
-        "cv_accuracy_std": round(cv_scores.std(), 4),
+        **metrics,
+        "cv_accuracy_mean": round(float(cv_scores.mean()), 4),
+        "cv_accuracy_std": round(float(cv_scores.std()), 4),
         "confusion_matrix": cm.tolist(),
-        "class_names": le.classes_.tolist(),
+        "class_names": label_encoder.classes_.tolist(),
         "feature_importance": importances,
-        "comparison": [
-            {"model": "Decision Tree", "accuracy": 0.812, "precision": 0.79, "recall": 0.78, "f1": 0.78},
-            {"model": "Random Forest", "accuracy": 0.856, "precision": 0.84, "recall": 0.83, "f1": 0.83},
-            {"model": "Gradient Boosting (Proposed)", "accuracy": round(accuracy, 3), "precision": round(precision, 2), "recall": round(recall, 2), "f1": round(f1, 2)},
-        ]
+        "comparison": comparisons,
     }
-
-    print("\n  ✓ Flare classifier saved to models/flare_classifier.joblib")
-    return flare_metrics, gb_model, scaler, le
 
 
 def train_cable_risk_model():
-    """
-    Stage 2: Hybrid XGBoost Cable Risk Prediction
-    
-    Feature vector (Eq.): Xc = {Sf, VCME, Bz, Vsw, Kp, Lat, Lcable}
-    Interaction term (Eq. 8): I = Sf × |Bz|
-    XGBoost prediction (Eq. 9-11)
-    Risk categories (Eq. 13): Low/Medium/High
-    Latitude amplification (Eq. 14): R_final = R × (1 + α|Lat|)
-    """
     print("\n" + "=" * 60)
-    print("STAGE 2: Cable Risk Prediction (Hybrid XGBoost)")
+    print("STAGE 2: Cable Risk Classification + Regression")
     print("=" * 60)
 
-    # Load or generate data
-    if os.path.exists("data/cable_risk_data.csv"):
-        df = pd.read_csv("data/cable_risk_data.csv")
-    else:
-        df = generate_cable_risk_data(5000)
+    df = load_cable_data()
+    x = df[CABLE_FEATURES].values
 
-    features = ["Sf", "VCME", "Bz", "Vsw", "Kp", "Lat", "Lcable"]
-    X = df[features].values
+    label_encoder = LabelEncoder()
+    y_class = label_encoder.fit_transform(df["risk_category"].values)
+    y_score = df["risk_score"].values
 
-    # Create classification labels from risk_category
-    le_risk = LabelEncoder()
-    y = le_risk.fit_transform(df["risk_category"].values)  # High=0, Low=1, Medium=2
-
-    # Min-Max normalization (Eq. 1)
-    scaler = MinMaxScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    # Split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_scaled, y, test_size=0.2, random_state=42, stratify=y
+    x_train, x_test, y_class_train, y_class_test, y_score_train, y_score_test = train_test_split(
+        x,
+        y_class,
+        y_score,
+        test_size=0.2,
+        random_state=RANDOM_STATE,
+        stratify=y_class,
     )
 
-    # Train XGBoost (Eq. 9-11)
-    xgb_model = XGBClassifier(
+    scaler = MinMaxScaler()
+    x_train_scaled = scaler.fit_transform(x_train)
+    x_test_scaled = scaler.transform(x_test)
+
+    classifier = XGBClassifier(
         n_estimators=300,
-        learning_rate=0.1,
-        max_depth=6,
+        learning_rate=0.08,
+        max_depth=5,
         min_child_weight=3,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        reg_alpha=0.1,        # L1 regularization
-        reg_lambda=1.0,       # L2 regularization (Eq. 11: λ‖w‖²)
-        gamma=0.1,            # Eq. 11: γT
+        subsample=0.85,
+        colsample_bytree=0.85,
+        reg_alpha=0.1,
+        reg_lambda=1.0,
+        gamma=0.1,
         objective="multi:softprob",
         num_class=3,
-        random_state=42,
+        random_state=RANDOM_STATE,
         eval_metric="mlogloss",
-        use_label_encoder=False,
     )
-    xgb_model.fit(X_train, y_train)
+    classifier.fit(x_train_scaled, y_class_train)
 
-    # Evaluate
-    y_pred = xgb_model.predict(X_test)
-    y_proba = xgb_model.predict_proba(X_test)
+    regressor = XGBRegressor(
+        n_estimators=350,
+        learning_rate=0.06,
+        max_depth=5,
+        min_child_weight=3,
+        subsample=0.85,
+        colsample_bytree=0.85,
+        reg_alpha=0.05,
+        reg_lambda=1.0,
+        objective="reg:squarederror",
+        random_state=RANDOM_STATE,
+        eval_metric="rmse",
+    )
+    regressor.fit(x_train_scaled, y_score_train)
 
-    accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred, average="weighted")
-    recall = recall_score(y_test, y_pred, average="weighted")
-    f1 = f1_score(y_test, y_pred, average="weighted")
-    cm = confusion_matrix(y_test, y_pred)
+    y_class_pred = classifier.predict(x_test_scaled)
+    score_pred = np.clip(regressor.predict(x_test_scaled), 0, 1)
 
-    print(f"\n  Accuracy:  {accuracy:.4f}")
-    print(f"  Precision: {precision:.4f}")
-    print(f"  Recall:    {recall:.4f}")
-    print(f"  F1-Score:  {f1:.4f}")
-    print(f"\n  Confusion Matrix:")
-    print(f"  {cm}")
+    metrics = classification_metrics(y_class_test, y_class_pred)
+    cm = confusion_matrix(y_class_test, y_class_pred)
+    mae = mean_absolute_error(y_score_test, score_pred)
+    rmse = float(np.sqrt(mean_squared_error(y_score_test, score_pred)))
+    r2 = r2_score(y_score_test, score_pred)
 
-    # Cross-validation
-    cv_scores = cross_val_score(xgb_model, X_scaled, y, cv=5, scoring="accuracy")
-    print(f"\n  5-Fold CV Accuracy: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+    cv_classifier = XGBClassifier(
+        n_estimators=250,
+        learning_rate=0.08,
+        max_depth=5,
+        min_child_weight=3,
+        subsample=0.85,
+        colsample_bytree=0.85,
+        reg_alpha=0.1,
+        reg_lambda=1.0,
+        gamma=0.1,
+        objective="multi:softprob",
+        num_class=3,
+        random_state=RANDOM_STATE,
+        eval_metric="mlogloss",
+    )
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    cv_scores = cross_val_score(make_pipeline(MinMaxScaler(), cv_classifier), x, y_class, cv=cv, scoring="accuracy")
 
-    # Feature importance
-    importances = dict(zip(features, xgb_model.feature_importances_.tolist()))
-    print(f"\n  Feature Importance: {importances}")
+    reg_cv_model = XGBRegressor(
+        n_estimators=250,
+        learning_rate=0.06,
+        max_depth=5,
+        min_child_weight=3,
+        subsample=0.85,
+        colsample_bytree=0.85,
+        reg_alpha=0.05,
+        reg_lambda=1.0,
+        objective="reg:squarederror",
+        random_state=RANDOM_STATE,
+        eval_metric="rmse",
+    )
+    reg_cv = KFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    reg_r2_scores = cross_val_score(make_pipeline(MinMaxScaler(), reg_cv_model), x, y_score, cv=reg_cv, scoring="r2")
 
-    # Save
-    joblib.dump(xgb_model, "models/cable_risk_model.joblib")
+    comparisons = evaluate_classifier_comparison(
+        [
+            (
+                "Logistic Regression",
+                LogisticRegression(max_iter=1000, random_state=RANDOM_STATE),
+            ),
+            ("Random Forest", RandomForestClassifier(n_estimators=250, random_state=RANDOM_STATE)),
+            (
+                "XGBoost (Proposed)",
+                XGBClassifier(
+                    n_estimators=300,
+                    learning_rate=0.08,
+                    max_depth=5,
+                    min_child_weight=3,
+                    subsample=0.85,
+                    colsample_bytree=0.85,
+                    reg_alpha=0.1,
+                    reg_lambda=1.0,
+                    gamma=0.1,
+                    objective="multi:softprob",
+                    num_class=3,
+                    random_state=RANDOM_STATE,
+                    eval_metric="mlogloss",
+                ),
+            ),
+        ],
+        x_train,
+        x_test,
+        y_class_train,
+        y_class_test,
+    )
+
+    classifier_importances = dict(zip(CABLE_FEATURES, classifier.feature_importances_.tolist()))
+    regressor_importances = dict(zip(CABLE_FEATURES, regressor.feature_importances_.tolist()))
+
+    joblib.dump(classifier, "models/cable_risk_model.joblib")
+    joblib.dump(regressor, "models/cable_risk_regressor.joblib")
     joblib.dump(scaler, "models/cable_risk_scaler.joblib")
-    joblib.dump(le_risk, "models/cable_risk_label_encoder.joblib")
+    joblib.dump(label_encoder, "models/cable_risk_label_encoder.joblib")
 
-    cable_metrics = {
-        "model": "XGBoost (Hybrid)",
-        "accuracy": round(accuracy, 4),
-        "precision": round(precision, 4),
-        "recall": round(recall, 4),
-        "f1_score": round(f1, 4),
-        "cv_accuracy_mean": round(cv_scores.mean(), 4),
-        "cv_accuracy_std": round(cv_scores.std(), 4),
+    print(f"\n  Accuracy:  {metrics['accuracy']:.4f}")
+    print(f"  Precision: {metrics['precision']:.4f}")
+    print(f"  Recall:    {metrics['recall']:.4f}")
+    print(f"  F1-Score:  {metrics['f1_score']:.4f}")
+    print(f"  MAE:       {mae:.4f}")
+    print(f"  RMSE:      {rmse:.4f}")
+    print(f"  R2:        {r2:.4f}")
+    print("\n  Confusion Matrix:")
+    print(f"  {cm}")
+    print(f"\n  5-Fold CV Accuracy: {cv_scores.mean():.4f} +/- {cv_scores.std():.4f}")
+    print(f"  5-Fold CV R2:       {reg_r2_scores.mean():.4f} +/- {reg_r2_scores.std():.4f}")
+    print(f"\n  Feature Importance: {classifier_importances}")
+    print("\n  [OK] Cable risk classifier and regressor saved")
+
+    return {
+        "model": "XGBoost (Hybrid classifier + regressor)",
+        **metrics,
+        "cv_accuracy_mean": round(float(cv_scores.mean()), 4),
+        "cv_accuracy_std": round(float(cv_scores.std()), 4),
         "confusion_matrix": cm.tolist(),
-        "class_names": le_risk.classes_.tolist(),
-        "feature_importance": importances,
-        "comparison": [
-            {"model": "Logistic Regression", "accuracy": 0.765, "precision": 0.74, "recall": 0.72, "f1": 0.73},
-            {"model": "Random Forest", "accuracy": 0.843, "precision": 0.82, "recall": 0.81, "f1": 0.81},
-            {"model": "XGBoost (Proposed)", "accuracy": round(accuracy, 3), "precision": round(precision, 2), "recall": round(recall, 2), "f1": round(f1, 2)},
-        ]
+        "class_names": label_encoder.classes_.tolist(),
+        "feature_importance": classifier_importances,
+        "regression": {
+            "mae": round(float(mae), 4),
+            "rmse": round(float(rmse), 4),
+            "r2": round(float(r2), 4),
+            "cv_r2_mean": round(float(reg_r2_scores.mean()), 4),
+            "cv_r2_std": round(float(reg_r2_scores.std()), 4),
+        },
+        "regression_feature_importance": regressor_importances,
+        "risk_thresholds": {
+            "low_medium": LOW_MEDIUM_THRESHOLD,
+            "medium_high": MEDIUM_HIGH_THRESHOLD,
+        },
+        "comparison": comparisons,
     }
-
-    print("\n  ✓ Cable risk model saved to models/cable_risk_model.joblib")
-    return cable_metrics, xgb_model, scaler, le_risk
 
 
 if __name__ == "__main__":
-    # Generate data first
     os.makedirs("data", exist_ok=True)
+    os.makedirs("models", exist_ok=True)
 
-    if not os.path.exists("data/solar_flare_data.csv"):
-        print("Generating training data...\n")
-        from generate_data import generate_solar_flare_data, generate_cable_risk_data
-        generate_solar_flare_data(3000).to_csv("data/solar_flare_data.csv", index=False)
-        generate_cable_risk_data(5000).to_csv("data/cable_risk_data.csv", index=False)
+    flare_metrics = train_flare_classifier()
+    cable_metrics = train_cable_risk_model()
 
-    # Train both models
-    flare_metrics, _, _, _ = train_flare_classifier()
-    cable_metrics, _, _, _ = train_cable_risk_model()
-
-    # Save combined metrics
     all_metrics = {
         "flare_classifier": flare_metrics,
         "cable_risk_model": cable_metrics,
@@ -257,6 +403,7 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("ALL MODELS TRAINED SUCCESSFULLY")
     print("=" * 60)
-    print(f"  Flare Classifier Accuracy:  {flare_metrics['accuracy']}")
-    print(f"  Cable Risk Model Accuracy:  {cable_metrics['accuracy']}")
-    print(f"  Metrics saved to: models/metrics.json")
+    print(f"  Flare Classifier Accuracy: {flare_metrics['accuracy']}")
+    print(f"  Cable Risk Accuracy:       {cable_metrics['accuracy']}")
+    print(f"  Cable Risk RMSE:           {cable_metrics['regression']['rmse']}")
+    print("  Metrics saved to: models/metrics.json")

@@ -157,7 +157,7 @@ function fallbackSegmentRisks(segments: DerivedSegment[], scenario: EngineScenar
 async function buildImpactResponse(scenario: EngineScenario, weather?: SpaceWeather): Promise<ImpactResponse> {
   const segments = CACHED_CABLES.flatMap((cable) => buildCableSegments(cable))
 
-  let segmentRisks: CableSegmentRisk[] = []
+  let segmentRisks: CableSegmentRisk[]
   let modelUsed = "xgboost-segmented"
   let fallbackUsed = false
 
