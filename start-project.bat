@@ -31,10 +31,14 @@ if errorlevel 1 (
   exit /b 1
 )
 
-call :find_python
+where python >nul 2>&1
 if errorlevel 1 (
-  pause
-  exit /b 1
+  where py >nul 2>&1
+  if errorlevel 1 (
+    echo Python was not found. Install Python 3, then run this script again.
+    pause
+    exit /b 1
+  )
 )
 
 echo Starting ML backend at %ML_URL%
@@ -58,10 +62,17 @@ if errorlevel 1 (
   exit /b 1
 )
 
-call :find_python
-if errorlevel 1 (
-  pause
-  exit /b 1
+where python >nul 2>&1
+if not errorlevel 1 (
+  set "PY_CMD=python"
+) else (
+  where py >nul 2>&1
+  if errorlevel 1 (
+    echo Python was not found. Install Python 3, then run this script again.
+    pause
+    exit /b 1
+  )
+  set "PY_CMD=py -3"
 )
 
 if not exist ".venv\Scripts\python.exe" (
@@ -74,10 +85,36 @@ if not exist ".venv\Scripts\python.exe" (
   )
 )
 
-call :install_backend_deps_if_needed
-if errorlevel 1 (
-  pause
-  exit /b 1
+set "NEED_BACKEND_DEPS=0"
+if not exist "%BACKEND_DEPS_STAMP%" (
+  set "NEED_BACKEND_DEPS=1"
+) else (
+  fc /b requirements.txt "%BACKEND_DEPS_STAMP%" >nul
+  if errorlevel 1 set "NEED_BACKEND_DEPS=1"
+)
+
+if "%NEED_BACKEND_DEPS%"=="1" (
+  echo Installing or updating backend dependencies...
+  .venv\Scripts\python.exe -m pip install --upgrade pip
+  if errorlevel 1 (
+    echo Failed to upgrade pip.
+    pause
+    exit /b 1
+  )
+
+  .venv\Scripts\python.exe -m pip install -r requirements.txt
+  if errorlevel 1 (
+    echo Failed to install backend dependencies.
+    pause
+    exit /b 1
+  )
+
+  copy /y requirements.txt "%BACKEND_DEPS_STAMP%" >nul
+  if errorlevel 1 (
+    echo Failed to update backend dependency stamp.
+    pause
+    exit /b 1
+  )
 )
 
 set "PYTHONIOENCODING=utf-8"
@@ -118,47 +155,3 @@ echo Starting frontend server on %FRONTEND_URL%
 npm run dev
 pause
 exit /b %errorlevel%
-
-:find_python
-where python >nul 2>&1
-if not errorlevel 1 (
-  set "PY_CMD=python"
-  exit /b 0
-)
-
-where py >nul 2>&1
-if not errorlevel 1 (
-  set "PY_CMD=py -3"
-  exit /b 0
-)
-
-echo Python was not found. Install Python 3, then run this script again.
-exit /b 1
-
-:install_backend_deps_if_needed
-if not exist "%BACKEND_DEPS_STAMP%" goto install_backend_deps
-fc /b requirements.txt "%BACKEND_DEPS_STAMP%" >nul
-if errorlevel 1 goto install_backend_deps
-exit /b 0
-
-:install_backend_deps
-echo Installing or updating backend dependencies...
-.venv\Scripts\python.exe -m pip install --upgrade pip
-if errorlevel 1 (
-  echo Failed to upgrade pip.
-  exit /b 1
-)
-
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-if errorlevel 1 (
-  echo Failed to install backend dependencies.
-  exit /b 1
-)
-
-copy /y requirements.txt "%BACKEND_DEPS_STAMP%" >nul
-if errorlevel 1 (
-  echo Failed to update backend dependency stamp.
-  exit /b 1
-)
-
-exit /b 0

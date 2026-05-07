@@ -93,12 +93,12 @@ class FlareResult(BaseModel):
 
 class CableRiskInput(BaseModel):
     Sf: float = Field(..., ge=1.0, le=3.0)
-    VCME: float = Field(..., ge=250.0, le=3500.0)
+    VCME: float = Field(..., ge=0.0, le=5000.0)
     Bz: float = Field(..., ge=-60.0, le=60.0)
-    Vsw: float = Field(..., ge=250.0, le=1200.0)
+    Vsw: float = Field(..., ge=0.0, le=2000.0)
     Kp: float = Field(..., ge=0.0, le=9.0)
     Lat: float = Field(..., ge=-90.0, le=90.0)
-    Lcable: float = Field(..., ge=1.0, le=20000.0)
+    Lcable: float = Field(..., ge=1.0, le=100000.0)
 
 
 class CableRiskResult(BaseModel):
@@ -132,7 +132,16 @@ def flare_feature_array(input_data: FlareInput):
 
 
 def cable_feature_array(input_data: CableRiskInput):
-    return np.array([[getattr(input_data, feature) for feature in CABLE_FEATURES]])
+    values = {
+        "Sf": np.clip(input_data.Sf, 1.0, 3.0),
+        "VCME": np.clip(input_data.VCME, 300.0, 3000.0),
+        "Bz": np.clip(input_data.Bz, -30.0, 10.0),
+        "Vsw": np.clip(input_data.Vsw, 300.0, 900.0),
+        "Kp": np.clip(input_data.Kp, 0.0, 9.0),
+        "Lat": np.clip(input_data.Lat, -90.0, 90.0),
+        "Lcable": np.clip(input_data.Lcable, 50.0, 15000.0),
+    }
+    return np.array([[values[feature] for feature in CABLE_FEATURES]])
 
 
 def predict_cable_outputs(input_data: CableRiskInput):

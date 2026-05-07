@@ -1,52 +1,113 @@
-# Solar Flare & CME Submarine Cable Impact Predictor
+# Solar Flare and CME Submarine Cable Impact Predictor
 
-A 3D interactive visualization tool that predicts and displays the potential impact of solar flares and Coronal Mass Ejections (CMEs) on global submarine cable infrastructure.
+An interactive engineering project that estimates how solar flares, CMEs, and geomagnetic storm conditions may affect global submarine cable routes and related infrastructure.
 
-## Features
+The app combines live space-weather telemetry, cable geo-coordinates, simulation controls, historical event context, and a Python ML backend.
 
-- **Real-Time Monitoring**: Fetches live solar wind data (speed, density, Bz) and Kp index from NOAA SWPC.
-- **Interactive 3D Globe**: Visualizes submarine cables and highlights segments at risk using `react-globe.gl`.
-- **Risk Modeling**: Implements a simplified geophysical model to estimate Geomagnetically Induced Current (GIC) risks based on latitude, cable length, and storm intensity.
-- **Simulation Mode**: Allows users to simulate CME events with custom speeds, directions, and launch times to see potential future impacts.
+## Why This Is a Valid Final-Year Project
+
+This is a valid final-year engineering concept because it combines multiple engineering areas in one working system:
+
+- Space-weather data ingestion from NOAA SWPC and NASA DONKI.
+- Geo-coordinate processing for real submarine cable routes.
+- Machine learning with Gradient Boosting and XGBoost.
+- Physics-inspired risk scoring using Kp, southward Bz, CME speed, latitude, and cable length.
+- Full-stack implementation with Next.js frontend and FastAPI backend.
+- 3D visualization, simulation, analytics, watchlist alerts, export, and historical matching.
+
+The project should be presented as an educational decision-support and risk-estimation tool, not as an operational forecast system.
+
+## Current Features
+
+- Real-time space-weather monitoring using NOAA SWPC solar wind and Kp data.
+- Interactive 3D globe showing submarine cable routes and risk hotspots.
+- Real-time cable impact prediction with ML backend and TypeScript fallback model.
+- CME simulation mode with speed, launch time, and impact direction.
+- Solar flare classifier for C/M/X class prediction.
+- Cable risk classifier and regressor for Low/Medium/High risk plus continuous score.
+- Analytics dashboard with feature importance, metrics, credibility warnings, and data coverage.
+- Historical event matching and replay presets.
+- Cable watchlist with threshold alerts.
+- Cross-sector impact outlook for cables, grids, satellites, GNSS, radio, aviation, pipelines, and auroral activity.
+- JSON/CSV export for simulation and impact reports.
+- One-click Windows startup script for frontend and backend.
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14 (App Router), React, Tailwind CSS, Lucide React
-- **Visualization**: `react-globe.gl` (Three.js wrapper)
-- **State Management**: TanStack Query (React Query)
-- **Backend**: Next.js API Routes (Serverless functions)
+- Frontend: Next.js 16, React 19, TypeScript, Tailwind CSS.
+- Visualization: react-globe.gl / Three.js.
+- Server routes: Next.js API routes.
+- ML backend: FastAPI, scikit-learn, XGBoost.
+- State/data fetching: TanStack Query.
 
-## Getting Started
+## ML Backend
 
-1. **Install Dependencies**:
-   \`\`\`bash
-   npm install
-   \`\`\`
+The backend runs at:
 
-2. **Run Development Server**:
-   \`\`\`bash
-   npm run dev
-   \`\`\`
+```text
+http://127.0.0.1:8000
+```
 
-3. **Open Application**:
-   Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
+Models:
 
-## Environment Variables
+- Flare classifier: Gradient Boosting classifier.
+- Cable risk model: XGBoost classifier plus XGBoost regressor.
 
-Create a `.env.local` file in the root directory to configure external data sources (optional for demo mode as fallbacks are included):
+Current risk thresholds:
 
-\`\`\`env
-# Optional: URL to a custom GeoJSON file for submarine cables
-SUBMARINE_CABLE_GEOJSON_URL=https://example.com/cables.json
-\`\`\`
+```text
+Low:    score < 0.25
+Medium: 0.25 <= score < 0.45
+High:   score >= 0.45
+```
 
-## Methodology & Disclaimer
+The backend clamps extreme real-world route values to the model training range before prediction, so very long estimated cable segments do not break batch prediction.
 
-This tool uses a simplified proxy model for educational purposes:
-- **Risk Factors**: Considers geomagnetic latitude (auroral oval proximity), cable length (voltage accumulation), and storm intensity (Kp/Solar Wind).
-- **Data Sources**: 
-  - Solar Wind: NOAA Space Weather Prediction Center (SWPC)
-  - CME Parameters: NASA DONKI
-  - Cables: TeleGeography (Mock/Public data for demo)
+## Run Project
 
-**Note**: This is NOT an operational forecast tool. Real-world GIC impact depends on complex ground conductivity models and detailed cable electrical characteristics not modeled here.
+Use the provided Windows script:
+
+```powershell
+.\start-project.bat
+```
+
+It starts:
+
+- Backend: `http://127.0.0.1:8000`
+- Frontend: `http://localhost:3000`
+
+The script reuses existing `node_modules` and `ml_backend\.venv`. It reinstalls backend dependencies only when `ml_backend\requirements.txt` changes.
+
+## Manual Run
+
+Backend:
+
+```powershell
+cd ml_backend
+.\.venv\Scripts\python.exe app.py
+```
+
+Frontend:
+
+```powershell
+npm run dev
+```
+
+## Verification Commands
+
+```powershell
+npm run lint
+npx tsc --noEmit
+npm run build
+npm audit
+```
+
+Backend check:
+
+```text
+http://127.0.0.1:8000/health
+```
+
+## Important Disclaimer
+
+This project is not an operational space-weather forecast tool. Real infrastructure impact depends on ground conductivity, cable electrical design, repeater protection, regional grid coupling, and detailed storm evolution. This system is best described as a research prototype and educational decision-support simulator.
